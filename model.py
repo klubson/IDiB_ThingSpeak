@@ -2,14 +2,13 @@ import datetime
 import json
 import time
 
-import pandas as pd
+import pandas
 import thingspeak
-
-import CONST
+import constant_variables
 
 
 def get_channel():
-    return thingspeak.Channel(202842, fmt='csv')
+    return thingspeak.Channel(constant_variables.thingspeak_channel, fmt='csv')
 
 
 def get_field_info(channel):
@@ -32,8 +31,8 @@ def convert_date(date, time):
     return x.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def get_data_for_day(channel, field, start_date, start_time):
-    end_date = start_date + datetime.timedelta(days=CONST.days)
+def get_daily_data(channel, field, start_date, start_time):
+    end_date = start_date + datetime.timedelta(days=constant_variables.deltatime_days)
     return get_data_by_date(channel, field, start_date, start_time, end_date, start_time)
 
 
@@ -61,7 +60,6 @@ def parse_data(field):
     year = []
     for elem in first_parse:
         if elem == '\r' or elem == '"':
-            # print("Bad data format:" + elem)
             continue
         elem_list = elem.replace("\r", "").split(',')
         if elem_list[2] != '':
@@ -80,7 +78,7 @@ def analyze_dataframe(dataframe):
     avg_value = []
     amount = []
     for year in base_years:
-        data_in_year = dataframe[dataframe['rok'] == year].get("y")
+        data_in_year = dataframe[dataframe['year'] == year].get("y")
         if not data_in_year.empty:
 
             years.append(year)
@@ -89,4 +87,4 @@ def analyze_dataframe(dataframe):
             avg_value.append(round(sum(data_in_year) / len(data_in_year), 2))
             amount.append(len(data_in_year))
     print(years)
-    return pd.DataFrame(dict(rok=years, minimal=min_value, maximal=max_value, average=avg_value, amount=amount))
+    return pandas.DataFrame(dict(year=years, minimum=min_value, maximum=max_value, average=avg_value, amount=amount))
