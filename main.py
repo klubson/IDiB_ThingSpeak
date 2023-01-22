@@ -1,39 +1,24 @@
 import datetime
-import sqlite3
-
+import time
 import pandas
-import plotly.express as px
-import streamlit as st
+import plotly.express
+import streamlit
 
+import constant_variables
 import model
 
 
-def convert_date(date, time):
-    converted_date = datetime.datetime.combine(date, time)
-    return converted_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def add_year_to_date(date, year):
-    return str(year) + date.strftime("-%m-%dT%H:%M:%SZ")
-
-
-def draw_single_data(dataframe):
-    st.write("Data amount:", len(dataframe['x']))
-    figure = px.scatter(dataframe, x="x", y="y", color_discrete_map={"y": "red"})
-    st.write(figure)
-
-
-def create_data_frame(constant, xs, ys, years):
-    x = []
-    y = []
-    year = []
+def create_data_frame(const, xs, ys, years):
+    time = []
+    value = []
+    rok = []
     for i in range(len(xs)):
         dates = xs[i]
         for j in range(len(dates)):
-            x.append(constant + dates[j][4:])
-            y.append(ys[i][j])
-            year.append(years[i][j])
-    return pandas.DataFrame(dict(x=x, y=y, year=year))
+            time.append(const + dates[j][4:])
+            value.append(ys[i][j])
+            rok.append(years[i][j])
+    return pandas.DataFrame(dict(x=time, y=value, rok=rok))
 
 
 def change_year(date, year):
@@ -41,126 +26,84 @@ def change_year(date, year):
 
 
 def multiple_request_for_years(start, time, days_num):
-    years_to_compare = [2019, 2020, 2021, 2022, 2023]
-    x_axis_for_year = []
-    y_axis_for_year = []
-    year_for_year = []
+    years_to_compare = [2019, 2020, 2021, 2022]
+    my_bar1 = streamlit.progress(0)
+    x_for_year = []
+    y_for_year = []
+    rok_for_year = []
     counter = 0
     for i in years_to_compare:
         counter += 1
         new_start = change_year(start, i)
-        x, y, year = multiple_request(new_start, time, days_num)
-        x_axis_for_year.append(x)
-        y_axis_for_year.append(y)
-        year_for_year.append(year)
-    return x_axis_for_year, y_axis_for_year, year_for_year
+
+        my_bar0.progress(1.0)
+        x, y, rok = multiple_request(new_start, time, days_num, my_bar0)
+        x_for_year.append(x)
+        y_for_year.append(y)
+        rok_for_year.append(rok)
+
+        my_bar1.progress(counter / len(years_to_compare))
+    my_bar1.progress(1.0)
+    return x_for_year, y_for_year, rok_for_year
 
 
-def multiple_request(date, time, days_num):
+def multiple_request(date, time, days_num, my_bar):
     x = []
     y = []
     year = []
-    for i in range(0, days_num, 3):
+    for i in range(0, days_num, constant_variables.deltatime_days):
         temp_x, temp_y, temp_year = model.parse_data(
-            model.get_daily_data(channel, chosen_field, date, time))
-        print(" retrieved ", len(temp_x[0]), "elements")
+            model.get_data_for_day(channel, chosen_field, date, time))
         x += temp_x
         y += temp_y
         year += temp_year
-        date += datetime.timedelta(days=3)
-    return x, y, year
+        date += datetime.timedelta(days=constant_variables.deltatime_days)
+        my_bar.progress(i / days_num)
+    my_bar.progress(1.0)
 
-
-def read_database_by_start_date(table_name, date, time, days_num):
-    start_date = date
-    start_time = time
-    end_date = start_date + datetime.timedelta(days=days_num)
-    end_time = time
-    return read_database(table_name, start_date, start_time, end_date, end_time)
-
-
-def read_database(table_name, start_date, start_time, end_date, end_time):
-    connection = sqlite3.connect("thing.db")
-    cursor = connection.cursor()
-    start_date_time = "'" + str(start_date) + " " + str(start_time) + "'"
-    end_date_time = "'" + str(end_date) + " " + str(end_time) + "'"
-    res = cursor.execute(
-        "Select * from " + table_name + " where datetime(date) between  datetime(" + start_date_time + ") and  datetime(" + end_date_time + ")")
-    db_result = res.fetchall()
-    print(start_date_time, end_date_time, len(db_result))
-    x = []
-    y = []
-    year = []
-    for i in db_result:
-        x.append(i[0][5:])
-        y.append(i[1])
-        year.append(i[0][:4])
     return x, y, year
 
 
 def draw_by_dataframe(dataframe):
     if not year_comparison:
-        st.write("Data amount:", len(dataframe['x']))
-        figure = px.scatter(dataframe, x="x", y="y", color_discrete_map={"y": "red"})
-        st.write(figure)
+        streamlit.write("Number of measurements:", len(dataframe['x']))
+        figure = plotly.express.scatter(dataframe, x="x", y="y", color_discrete_map={"y": "red"})
+        streamlit.write(figure)
+
+        dataframe = model.analyze_dataframe_with_one_year(df)
+        streamlit.dataframe(dataframe)
     else:
-        st.write("Data amount:", len(dataframe["x"]))
-        figure = px.strip(dataframe, x="x", y="y", color="year")
-        st.write(figure)
-        dataframe = model.analyze_dataframe(dataframe)
-        st.dataframe(dataframe)
+        streamlit.write("Number of measurements:", len(df["x"]))
+        figure = plotly.express.strip(df, x="x", y="y", color="rok")
+        streamlit.write(figure)
+        dataframe = model.analyze_dataframe_with_many_years(df)
+        streamlit.dataframe(dataframe)
 
 
-tables = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']
-
-# Pobieranie danych modelu
 channel = model.get_channel()
 fields = model.get_field_info(channel)
-option = st.sidebar.selectbox('Field', fields)
+option = streamlit.sidebar.selectbox('Field', fields)
 chosen_field = int(option.split(")")[0])
-chosen_table = tables[chosen_field - 1]
-range_option = st.sidebar.selectbox('Comparison range', ["Days", "Custom"])
-year_comparison = st.sidebar.checkbox('Year comparison')
+year_comparison = streamlit.sidebar.checkbox('Year comparison')
 
-if range_option == "Custom":
-    start_date = st.sidebar.date_input("Start date", datetime.date(2022, 4, 10))
-    start_time = st.sidebar.time_input('Start time', datetime.time(12, 00))
-    end_date = st.sidebar.date_input("End date", datetime.date(2022, 4, 17))
-    end_time = st.sidebar.time_input('End time', datetime.time(12, 00))
-    if start_date < end_date:
+start = time.time()
+start_date = streamlit.sidebar.date_input("Measurement start date", constant_variables.measurement_start_date)
+start_time = streamlit.sidebar.time_input('Measurement start time', constant_variables.measurement_start_time)
+number_of_days = streamlit.sidebar.number_input('Measurement days', min_value=1,
+                                                value=constant_variables.deltatime_days, step=1)
 
-        st.warning("No data")
+my_bar0 = streamlit.progress(0)
 
-        x, y, year = read_database(chosen_table, start_date, start_time, end_date, end_time)
-        dataframe = pandas.DataFrame(dict(x=x, y=y, year=year))
-        # draw(model.get_data_by_date(channel, chosen_field, start_date, start_time, end_date, end_time))
+if not year_comparison:
+    x, y, year = multiple_request(start_date, start_time, number_of_days, my_bar0)
 
-        draw_by_dataframe(dataframe)
-    else:
-        st.error("Wrong timeframe")
+    df = pandas.DataFrame(dict(x=x, y=y, rok=year))
 
-elif range_option == "Days":
-
-    start_date = st.sidebar.date_input("Start date", datetime.date(2022, 2, 11))
-    start_time = st.sidebar.time_input('Start time', datetime.time(14, 20))
-    number_of_days = st.sidebar.number_input('Insert a number of days', min_value=1, value=2, step=1)
-
-    if not year_comparison:
-        # x, y, year = multiple_request(start_date, start_time, number_of_days)
-        x, y, year = read_database_by_start_date(chosen_table, start_date, start_time, number_of_days)
-
-        dataframe = pandas.DataFrame(dict(x=x, y=y, year=year))
-    else:
-        x = []
-        y = []
-        year = []
-        for i in [2019, 2020, 2021, 2022, 2023]:
-            date = datetime.date(i, start_date.month, start_date.day)
-            x_temp, y_temp, year_temp = read_database_by_start_date(chosen_table, date, start_time, number_of_days)
-            x.extend(x_temp)
-            y.extend(y_temp)
-            year.extend(year_temp)
-        dataframe = pandas.DataFrame(dict(x=x, y=y, year=year))
-    draw_by_dataframe(dataframe)
 else:
-    st.warning("Nothing to do")
+    x, y, year = multiple_request_for_years(start_date, start_time, number_of_days)
+    df = create_data_frame(str(start_date.year), x, y, year)
+
+end = time.time()
+streamlit.write("Processing time: ", round(end - start, 3), "seconds")
+
+draw_by_dataframe(df)

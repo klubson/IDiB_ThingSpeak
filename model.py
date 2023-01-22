@@ -1,9 +1,10 @@
 import datetime
 import json
 import time
-
 import pandas
 import thingspeak
+import statistics
+
 import constant_variables
 
 
@@ -42,13 +43,18 @@ def get_data_by_date(channel, field, start_date, start_time, end_date, end_time)
     return get_data_by_string(channel, field, start, end)
 
 
+def get_data_for_day(channel, field, start_date, start_time):
+    end_date = start_date + datetime.timedelta(days=constant_variables.deltatime_days)
+    return get_data_by_date(channel, field, start_date, start_time, end_date, start_time)
+
+
 def get_data_by_string(channel, field, start, end):
     options = {"start": start, "end": end, "format": "csv", "results": 8000}
-    print("SEND from " + start + " to " + end, end="")
+    #print("SEND from " + start + " to " + end, end="")
     start = time.time()
     x = channel.get_field(field, options=options)
     end = time.time()
-    print(" took ", round(end - start, 3), "seconds", end="")
+    #print(" took ", round(end - start, 3), "seconds", end="")
 
     return x
 
@@ -69,22 +75,44 @@ def parse_data(field):
     return date, value, year
 
 
-def analyze_dataframe(dataframe):
-    base_years = ["2019", "2020", "2021", "2022", "2023"]
-    years = []
-
+def analyze_dataframe_with_many_years(dataframe):
+    years = ["2019", "2020", "2021", "2022", "2023"]
+    used_years = []
     min_value = []
     max_value = []
     avg_value = []
+    median_value = []
     amount = []
-    for year in base_years:
-        data_in_year = dataframe[dataframe['year'] == year].get("y")
-        if not data_in_year.empty:
+    for year in years:
+        data_in_year = dataframe[dataframe['rok'] == year].get("y")
 
-            years.append(year)
+        if not data_in_year.empty:
+            used_years.append(year)
             min_value.append(min(data_in_year))
             max_value.append(max(data_in_year))
             avg_value.append(round(sum(data_in_year) / len(data_in_year), 2))
+            median_value.append(statistics.median(data_in_year))
             amount.append(len(data_in_year))
-    print(years)
-    return pandas.DataFrame(dict(year=years, minimum=min_value, maximum=max_value, average=avg_value, amount=amount))
+    return pandas.DataFrame(
+        dict(rok=used_years, wartość_minimalna=min_value, wartość_maksymalna=max_value, wartość_średnia=avg_value,
+             mediana=median_value, liczba_pomiarów=amount)).round(2)
+
+
+def analyze_dataframe_with_one_year(dataframe):
+    year = dataframe.get("rok")[0]
+    min_value = []
+    max_value = []
+    avg_value = []
+    median_value = []
+    amount = []
+    data = dataframe.get("y")
+    min_value.append(min(data))
+    max_value.append(max(data))
+    avg_value.append(round(sum(data) / len(data), 2))
+    median_value.append(statistics.median(data))
+    amount.append(len(data))
+
+    return pandas.DataFrame(
+        dict(rok=year, wartość_minimalna=min_value, wartość_maksymalna=max_value,
+             wartość_średnia=avg_value,
+             mediana=median_value, liczba_pomiarów=amount)).round(2)
