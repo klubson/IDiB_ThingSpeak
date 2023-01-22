@@ -83,7 +83,7 @@ def draw_by_dataframe(dataframe):
 
 channel = model.get_channel()
 fields = model.get_field_info(channel)
-option = streamlit.sidebar.selectbox('Field', fields)
+option = streamlit.sidebar.selectbox('Measured dimension', fields)
 chosen_field = int(option.split(")")[0])
 year_comparison = streamlit.sidebar.checkbox('Year comparison')
 
