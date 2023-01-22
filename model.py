@@ -48,15 +48,9 @@ def get_data_for_day(channel, field, start_date, start_time):
     return get_data_by_date(channel, field, start_date, start_time, end_date, start_time)
 
 
-def get_data_by_string(channel, field, start, end):
-    options = {"start": start, "end": end, "format": "csv", "results": 8000}
-    #print("SEND from " + start + " to " + end, end="")
-    start = time.time()
-    x = channel.get_field(field, options=options)
-    end = time.time()
-    #print(" took ", round(end - start, 3), "seconds", end="")
-
-    return x
+def get_data_by_string(channel, field, start_date, end_date):
+    options = {"start": start_date, "end": end_date, "format": "csv", "results": 2000}
+    return channel.get_field(field, options=options)
 
 
 def parse_data(field):
